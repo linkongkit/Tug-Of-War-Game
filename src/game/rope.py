@@ -15,10 +15,11 @@ class Rope:
         self.body_img = load_image("rope-body.png")
         self.knot_img = load_image("rope-knot.png")
 
+        # prepare scaled tile for body (make the body image 2x larger, keep everything else the same)
         if self.body_img:
             try:
-                # double the baseline body tile height (baseline 24 -> now 48)
-                target_h = 24 * 2
+                # slightly larger than previous (was 48); make rope a bit thicker
+                target_h = 56
                 w, h = self.body_img.get_size()
                 scale_w = max(1, int(w * (target_h / float(h))))
                 self.body_tile = pygame.transform.smoothscale(self.body_img, (scale_w, target_h))
@@ -27,7 +28,7 @@ class Rope:
         else:
             self.body_tile = None
 
-        # revert knot sizing to baseline (clamp to max 48px tall)
+        # prepare knot image (baseline behaviour: clamp to max 48px tall)
         if self.knot_img:
             try:
                 kw, kh = self.knot_img.get_size()
@@ -54,17 +55,18 @@ class Rope:
                 surface.blit(self.body_tile, (x, y))
                 x += tile_w
         else:
-            pygame.draw.line(surface, (220, 200, 60), (0, self.y), (self.width, self.y), 18)
+            # fallback: draw a thicker line (2x thickness)
+            pygame.draw.line(surface, (220, 200, 60), (0, self.y), (self.width, self.y), 6)
 
     def draw_knot(self, surface):
         if self.knot_img:
             kw, kh = self.knot_img.get_size()
             kx = int(self.pos - kw // 2)
-            ky = int(self.y - kh // 2 + self.knot_offset)
+            ky = int(self.y - kh // 2 + getattr(self, "knot_offset", 0))
             surface.blit(self.knot_img, (kx, ky))
         else:
-            # larger fallback circle so it's visible
-            pygame.draw.circle(surface, (240, 240, 240), (int(self.pos), int(self.y + self.knot_offset)), 8)
+            # baseline fallback circle
+            pygame.draw.circle(surface, (240, 240, 240), (int(self.pos), int(self.y + getattr(self, "knot_offset", 0))), 8)
 
     def reset(self):
         self.rope = Rope(self.width, self.height)
