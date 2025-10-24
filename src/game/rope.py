@@ -1,5 +1,6 @@
 import pygame
 from game.utils import load_image
+from game.player import Player
 
 class Rope:
     def __init__(self, width, height):
@@ -88,3 +89,10 @@ class Rope:
             pass
         self.left = Player('left', x=70, y=self.height//2 + 20)
         self.right = Player('right', x=self.width-130, y=self.height//2 + 20)
+
+    def update(self):
+        # update effects
+        for e in self.effects:
+            e.update()
+        # remove finished
+        self.effects = [e for e in self.effects if not e.finished]

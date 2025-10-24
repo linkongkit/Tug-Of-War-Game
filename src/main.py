@@ -17,13 +17,16 @@ def main():
     select_sound = load_sound("select.wav")
     menu_music = load_music("menu.wav")
     gameplay_music = load_music("gameplay.wav")
+    clone_sound = load_sound("clone-smoke.wav")
 
     if pull_sound:
         pull_sound.set_volume(0.6)
     if win_sound:
         win_sound.set_volume(0.9)
     if select_sound:
-        select_sound.set_volume(0.8)
+        select_sound.set_volume(1.0)
+    if clone_sound:
+        clone_sound.set_volume(1.0)
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Tug Of War - Prototype")
@@ -34,6 +37,7 @@ def main():
     game.select_sound = select_sound
     game.menu_music = menu_music
     game.gameplay_music = gameplay_music
+    game.clone_sound = clone_sound
 
     # start menu music if available
     try:

@@ -1,8 +1,8 @@
-import sys
+Bimport sys
 import pygame
 from .player import Player
 from .rope import Rope
-from .utils import load_image, load_sound, load_music
+from .utils import play_music, stop_music, load_image, load_sound, load_music
 from game.effects import SpriteEffect, load_sequence
 
 def load_sequence(folder_name, pad=3):
@@ -92,45 +92,28 @@ class Game:
         if clone_sound:
             clone_sound.set_volume(0.9)
 
-        # attach clone sound to this Game instance instead of creating a nested Game
-        self.clone_sound = clone_sound
+#         game = Game(screen, WIDTH, HEIGHT, ai=False)
+        game.clone_sound = clone_sound
 
     def _set_music(self, which):
-        """Play music for 'menu' or 'gameplay'.
-        Accepts either a pygame.mixer.Sound object or a filename returned by load_music.
-        """
-        try:
-            music_obj = getattr(self, f"{which}_music", None)
-        except Exception:
-            music_obj = None
+        """Switch background music to 'menu' or 'gameplay' (safe if files missing)."""
+        if which == "menu":
+            path = getattr(self, "menu_music", None)
+        elif which == "gameplay":
+            path = getattr(self, "gameplay_music", None)
+        else:
+            path = None
 
-        # diagnostic when music missing
-        if not music_obj:
-            print(f"[music] no {which}_music loaded")
+        # if same music already playing, do nothing
+        if path == self.current_music:
             return
 
-        # stop any currently playing music/sounds
-        try:
-            pygame.mixer.music.stop()
-        except Exception:
-            pass
-
-        # if we were given a Sound object, play it (looping)
-        if isinstance(music_obj, pygame.mixer.Sound):
-            try:
-                music_obj.play(-1)
-                print(f"[music] playing {which} via Sound object")
-            except Exception as e:
-                print(f"[music] failed to play Sound for {which}: {e}")
-            return
-
-        # otherwise assume it's a filename/path usable by pygame.mixer.music
-        try:
-            pygame.mixer.music.load(music_obj)
-            pygame.mixer.music.play(-1)
-            print(f"[music] playing {which} via mixer.music from {music_obj}")
-        except Exception as e:
-            print(f"[music] failed to load/play {which} ({music_obj}): {e}")
+        if path:
+            play_music(path, loops=-1, volume=0.6)
+            self.current_music = path
+        else:
+            stop_music()
+            self.current_music = None
 
     def _maybe_play_select_sound(self):
         snd = getattr(self, "select_sound", None)
@@ -312,35 +295,12 @@ class Game:
         except Exception:
             pass
 
-    def spawn_effect(self, x, y, kind="clone-smoke", frame_rate=12, target_h=None):
-        """Spawn a short-lived sprite-sequence effect at screen coords (x,y).
-           If target_h is provided, scale the effect frames so their height matches target_h.
-        """
+    def spawn_effect(self, x, y, kind="clone-smoke", frame_rate=12):
         if kind == "clone-smoke":
-            frames = getattr(self, "clone_smoke_frames", [])
+            frames = self.clone_smoke_frames
             if not frames:
                 return
-
-            # if target height requested, create scaled copies of frames
-            if target_h is not None:
-                scaled = []
-                for f in frames:
-                    fw, fh = f.get_size()
-                    if fh == 0:
-                        scaled.append(f)
-                        continue
-                    scale = float(target_h) / float(fh)
-                    nw = max(1, int(fw * scale))
-                    nh = max(1, int(fh * scale))
-                    try:
-                        scaled.append(pygame.transform.smoothscale(f, (nw, nh)))
-                    except Exception:
-                        scaled.append(f)
-                frames_used = scaled
-            else:
-                frames_used = frames
-
-            eff = SpriteEffect(x, y, frames_used, frame_rate=frame_rate)
+            eff = SpriteEffect(x, y, frames, frame_rate=frame_rate)
             self.effects.append(eff)
 
     def run(self):
@@ -391,12 +351,8 @@ class Game:
                         if event.key == pygame.K_f:
                             try:
                                 if self.left.activate_clone():
-                                    # spawn smoke in front of left player
-                                    fx = self.left.x + self.left.width // 2 + int(self.left.width * 0.6) + 5
-                                    fy = self.left.y
-                                    self.spawn_effect(fx, fy, target_h=self.left.height)
-                                    if getattr(self, "clone_sound", None):
-                                        self.clone_sound.play()
+                                    if getattr(self, "select_sound", None):
+                                        self.select_sound.play()
                             except Exception:
                                 pass
 
@@ -404,12 +360,8 @@ class Game:
                         if event.key == pygame.K_h:
                             try:
                                 if self.right.activate_clone():
-                                    # spawn smoke in front of right player
-                                    fx = self.right.x + self.right.width // 2 - int(self.right.width * 0.6) - 5
-                                    fy = self.right.y
-                                    self.spawn_effect(fx, fy, target_h=self.right.height)
-                                    if getattr(self, "clone_sound", None):
-                                        self.clone_sound.play()
+                                    if getattr(self, "select_sound", None):
+                                        self.select_sound.play()
                             except Exception:
                                 pass
 
@@ -485,11 +437,7 @@ class Game:
                 self.left.draw(self.screen)
                 self.right.draw(self.screen)
                 self.rope.draw_knot(self.screen)
-
-                # draw effects on top (smoke)
-                for e in self.effects:
-                    e.draw(self.screen)
-
+ 
             # update effects
             for e in self.effects:
                 e.update()
