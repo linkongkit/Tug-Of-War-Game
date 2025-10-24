@@ -96,39 +96,41 @@ class Game:
         self.clone_sound = clone_sound
 
     def _set_music(self, which):
-        """Play music for 'menu' or 'gameplay'.
-        Accepts either a pygame.mixer.Sound object or a filename returned by load_music.
-        """
+        """Play music for 'menu' or 'gameplay' using per-track volume if set."""
         try:
             music_obj = getattr(self, f"{which}_music", None)
         except Exception:
             music_obj = None
 
-        # diagnostic when music missing
+        vol = getattr(self, f"{which}_volume", None)
+
         if not music_obj:
             print(f"[music] no {which}_music loaded")
             return
 
-        # stop any currently playing music/sounds
         try:
             pygame.mixer.music.stop()
         except Exception:
             pass
 
-        # if we were given a Sound object, play it (looping)
+        # if load_music returned a Sound object, set its volume and play it looping
         if isinstance(music_obj, pygame.mixer.Sound):
             try:
+                if vol is not None:
+                    music_obj.set_volume(vol)
                 music_obj.play(-1)
-                print(f"[music] playing {which} via Sound object")
+                print(f"[music] playing {which} via Sound object (vol={vol})")
             except Exception as e:
                 print(f"[music] failed to play Sound for {which}: {e}")
             return
 
-        # otherwise assume it's a filename/path usable by pygame.mixer.music
+        # otherwise assume it's a filename/path for pygame.mixer.music
         try:
             pygame.mixer.music.load(music_obj)
+            if vol is not None:
+                pygame.mixer.music.set_volume(vol)
             pygame.mixer.music.play(-1)
-            print(f"[music] playing {which} via mixer.music from {music_obj}")
+            print(f"[music] playing {which} via mixer.music from {music_obj} (vol={vol})")
         except Exception as e:
             print(f"[music] failed to load/play {which} ({music_obj}): {e}")
 

@@ -237,10 +237,11 @@ class Player:
                 clone_img = img
             # offset in front toward center: left clone appears to the right, right clone to the left
             offset_x = int(self.width * 0.8)
+            # small manual nudges: left clone 2px left, right clone 2px right
             if self.side == "left":
-                cx = self.x + self.width // 2 + offset_x
+                cx = self.x + self.width // 2 + offset_x - 2
             else:
-                cx = self.x + self.width // 2 - offset_x
+                cx = self.x + self.width // 2 - offset_x + 2
             crect = clone_img.get_rect(center=(cx, self.y))
             surface.blit(clone_img, crect)
 
