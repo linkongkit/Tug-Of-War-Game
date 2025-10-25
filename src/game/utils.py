@@ -1,53 +1,99 @@
 import os
 import pygame
 
-# assets folder: src/assets/
-ASSETS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+ASSET_ROOT = os.path.join("src", "assets")
+
+# optional global bomb image; set to a Surface when available to avoid NameError
+_BOMB_IMG = None
 
 def init_audio():
-    """Initialize the mixer safely (call once at startup)."""
     try:
+        # safe pre-init and init
+        pygame.mixer.pre_init(44100, -16, 2, 512)
         pygame.mixer.init()
     except Exception:
-        # ignore if audio backend is not available
         pass
 
-def load_sound(name):
-    """Load a sound from src/assets/sfx/, return a Sound or None."""
-    path = os.path.join(ASSETS_DIR, "sfx", name)
-    if not os.path.isfile(path):
-        return None
+def _find_asset(subpaths):
+    for p in subpaths:
+        path = os.path.join(ASSET_ROOT, p)
+        if os.path.exists(path):
+            return path
+    return None
+
+def load_sound(filename):
+    """Return a pygame.mixer.Sound or None. Searches common asset folders."""
     try:
-        return pygame.mixer.Sound(path)
+        candidates = [
+            os.path.join("sfx", filename),
+            os.path.join("sounds", filename),
+            os.path.join("sound", filename),
+            os.path.join("", filename),
+        ]
+        for c in candidates:
+            path = os.path.join(ASSET_ROOT, c)
+            if os.path.exists(path):
+                try:
+                    return pygame.mixer.Sound(path)
+                except Exception:
+                    return None
+        # fallback: try direct path
+        if os.path.exists(filename):
+            try:
+                return pygame.mixer.Sound(filename)
+            except Exception:
+                return None
     except Exception:
-        return None
+        pass
+    return None
 
-def load_image(name, colorkey=None):
-    """Load an image from src/assets/sprites/, return Surface or None."""
-    path = os.path.join(ASSETS_DIR, "sprites", name)
-    if not os.path.isfile(path):
-        return None
+def load_music(filename):
+    """Return a file path for pygame.mixer.music.load or None."""
     try:
-        img = pygame.image.load(path)
+        path = os.path.join(ASSET_ROOT, "music", filename)
+        if os.path.exists(path):
+            return path
+        # also try src/assets/ (fallback)
+        path = os.path.join(ASSET_ROOT, filename)
+        if os.path.exists(path):
+            return path
     except Exception:
-        return None
+        pass
+    print(f"[load_music] File not found: {os.path.join(ASSET_ROOT, 'music', filename)}")
+    return None
 
-    # prefer convert_alpha, but fall back to convert if needed
+def load_image(filename):
+    """Return a pygame.Surface or None. Searches images and sprites folders."""
     try:
-        img = img.convert_alpha()
+        candidates = [
+            os.path.join("images", filename),
+            os.path.join("sprites", filename),
+            filename,
+        ]
+        for c in candidates:
+            path = os.path.join(ASSET_ROOT, c)
+            if os.path.exists(path) and os.path.isfile(path):
+                try:
+                    surf = pygame.image.load(path)
+                    try:
+                        return surf.convert_alpha()
+                    except Exception:
+                        return surf  # return raw surface if convert fails
+                except Exception:
+                    return None
+        # fallback: try direct path
+        if os.path.exists(filename):
+            try:
+                surf = pygame.image.load(filename)
+                try:
+                    return surf.convert_alpha()
+                except Exception:
+                    return surf
+            except Exception:
+                return None
     except Exception:
-        try:
-            img = img.convert()
-        except Exception:
-            pass
-
-    if colorkey is not None:
-        try:
-            img.set_colorkey(colorkey)
-        except Exception:
-            pass
-
-    return img
+        pass
+    return None
 
 def play_sound(sound, volume=1.0):
     """Play a pygame Sound if available."""
