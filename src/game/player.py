@@ -179,6 +179,156 @@ class Player:
             if self.freeze_timer <= 0:
                 pass  # thawed
 
+        # do nothing while frozen
+        if self.freeze_timer > 0:
+            return
+
+        if self.tap_timer > 0:
+            self.tap_timer -= 1
+            # double pull if clone active
+            multiplier = 2 if self.clone_active else 1
+            self.pull = self.pull_strength * multiplier
+            self.stamina -= self.stamina_drain
+            if self.stamina < 0:
+                self.stamina = 0
+            return
+
+        if self.ai_burst_timer > 0:
+            self.ai_burst_timer -= 1
+            multiplier = 2 if self.clone_active else 1
+            self.pull = self.pull_strength * multiplier
+            self.stamina -= self.stamina_drain
+            if self.stamina < 0:
+                self.stamina = 0
+            return
+
+        self.pull = 0
+        self.stamina += self.stamina_regen
+        if self.stamina > self.max_stamina:
+            self.stamina = self.max_stamina
+
+    def ai_act(self, rope_pos, rope_center, opponent_pull=0, threshold=10):
+        if self.ai_pause_timer > 0:
+            self.ai_pause_timer -= 1
+
+        if self.side == 'left':
+            condition = rope_pos > (rope_center + threshold)
+        else:
+            condition = rope_pos < (rope_center - threshold)
+
+        respond_bias = 0.15 if opponent_pull == 0 else 0.35
+
+        if self.ai_pause_timer == 0:
+            chance = self.ai_aggressiveness + respond_bias
+            if condition and random.random() < chance:
+                self.ai_burst_timer = random.randint(4, 12)
+                self.ai_pause_timer = random.randint(8, 24)
+                return
+
+        if opponent_pull == 0 and random.random() < 0.02:
+            self.ai_burst_timer = random.randint(3, 8)
+            self.ai_pause_timer = random.randint(6, 20)
+            return
+
+    def draw(self, surface):
+        img = None
+        # show pull frame when actively pulling, else ready/push frame if available
+        if self.pull > 0 and self.pull_img:
+            img = self.pull_img
+        elif self.push_img:
+            img = self.push_img
+
+        if img:
+            rect = img.get_rect(center=(self.x + self.width // 2, self.y))
+            surface.blit(img, rect)
+        else:
+            # fallback rectangle (red for left, blue for right)
+            color = (180, 60, 60) if self.side == 'left' else (60, 90, 180)
+            rect = pygame.Rect(self.x, self.y - self.height // 2, self.width, self.height)
+            pygame.draw.rect(surface, color, rect)
+
+        # draw clone (semi-transparent copy) in front if active
+        if self.clone_active and img:
+            try:
+                clone_img = img.copy()
+                # semi-transparent
+                clone_img.set_alpha(160)
+            except Exception:
+                clone_img = img
+            # offset in front toward center: left clone appears to the right, right clone to the left
+            offset_x = int(self.width * 0.8)
+            # small manual nudges: left clone 2px left, right clone 2px right
+            if self.side == "left":
+                cx = self.x + self.width // 2 + offset_x - 2
+            else:
+                cx = self.x + self.width // 2 - offset_x + 2
+            crect = clone_img.get_rect(center=(cx, self.y))
+            surface.blit(clone_img, crect)
+
+    def spawn_effect(self, x, y, kind="clone-smoke", frame_rate=12):
+        if kind == "clone-smoke":
+            frames = self.clone_smoke_frames
+            if not frames:
+                return
+            eff = SpriteEffect(x, y, frames, frame_rate=frame_rate)
+            self.effects.append(eff)
+
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_f:
+                    try:
+                        if self.left.activate_clone():
+                            # spawn effect slightly in front of player (toward center)
+                            fx = self.left.x + self.left.width // 2 + int(self.left.width * 0.6)
+                            fy = self.left.y
+                            self.spawn_effect(fx, fy)
+                            if getattr(self, "clone_sound", None):
+                                self.clone_sound.play()
+                    except Exception:
+                        pass
+
+                if event.key == pygame.K_h:
+                    try:
+                        if self.right.activate_clone():
+                            fx = self.right.x + self.right.width // 2 - int(self.right.width * 0.6)
+                            fy = self.right.y
+                            self.spawn_effect(fx, fy)
+                            if getattr(self, "clone_sound", None):
+                                self.clone_sound.play()
+                    except Exception:
+                        pass
+
+    def apply_bomb_hit(self, freeze_frames=None):
+        """Called when this player is hit by a bomb."""
+        if freeze_frames is None:
+            freeze_frames = self.freeze_duration_frames
+        self.freeze_timer = freeze_frames
+        # cancel any active actions
+        self.tap_timer = 0
+        self.ai_burst_timer = 0
+        self.ai_pause_timer = 0
+
+    def update(self):
+        # handle clone timer
+        if self.clone_timer > 0:
+            self.clone_timer -= 1
+            if self.clone_timer <= 0:
+                self.clone_active = False
+
+        # cooldown tick down
+        if self.clone_cooldown_timer > 0:
+            self.clone_cooldown_timer -= 1
+
+        # handle freeze timer
+        if self.freeze_timer > 0:
+            self.freeze_timer -= 1
+            if self.freeze_timer <= 0:
+                pass  # thawed
+
+        # do nothing while frozen
+        if self.freeze_timer > 0:
+            return
+
         if self.tap_timer > 0:
             self.tap_timer -= 1
             # double pull if clone active

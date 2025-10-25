@@ -100,43 +100,67 @@ class Game:
         self.clone_sound = clone_sound
 
     def _set_music(self, which):
-        """Play music for 'menu' or 'gameplay' using per-track volume if set."""
+        """Set background music for 'menu' or 'gameplay' reliably.
+
+        Stops any playing pygame.mixer.music and any previously played Sound object
+        before starting the requested track to avoid overlap.
+        """
         try:
             music_obj = getattr(self, f"{which}_music", None)
         except Exception:
             music_obj = None
-
         vol = getattr(self, f"{which}_volume", None)
 
-        if not music_obj:
-            print(f"[music] no {which}_music loaded")
-            return
+        print(f"[debug music] request set {which}: obj={music_obj}, vol={vol}")
 
+        # stop mixer music first
         try:
             pygame.mixer.music.stop()
         except Exception:
             pass
 
-        # if load_music returned a Sound object, set its volume and play it looping
-        if isinstance(music_obj, pygame.mixer.Sound):
-            try:
-                if vol is not None:
-                    music_obj.set_volume(vol)
-                music_obj.play(-1)
-                print(f"[music] playing {which} via Sound object (vol={vol})")
-            except Exception as e:
-                print(f"[music] failed to play Sound for {which}: {e}")
+        # stop any previously played Sound-based music we tracked
+        try:
+            prev = getattr(self, "_playing_music_sound", None)
+            if prev:
+                try:
+                    prev.stop()
+                except Exception:
+                    pass
+                self._playing_music_sound = None
+        except Exception:
+            pass
+
+        if not music_obj:
+            print(f"[music] no {which}_music loaded")
             return
 
-        # otherwise assume it's a filename/path for pygame.mixer.music
+        # If load_music returned a filename/path, use pygame.mixer.music
+        if isinstance(music_obj, str):
+            try:
+                pygame.mixer.music.load(music_obj)
+                if vol is not None:
+                    pygame.mixer.music.set_volume(vol)
+                pygame.mixer.music.play(-1)
+                self._playing_music_mode = "mixer"
+                print(f"[debug music] Loaded and playing {which}: {music_obj}")
+            except Exception as e:
+                print(f"[music] failed to load/play {which} ({music_obj}): {e}")
+            return
+
+        # Otherwise assume it's a pygame.mixer.Sound — play but track it so we can stop later
         try:
-            pygame.mixer.music.load(music_obj)
             if vol is not None:
-                pygame.mixer.music.set_volume(vol)
-            pygame.mixer.music.play(-1)
-            print(f"[music] playing {which} via mixer.music from {music_obj} (vol={vol})")
+                try:
+                    music_obj.set_volume(vol)
+                except Exception:
+                    pass
+            music_obj.play(-1)
+            self._playing_music_sound = music_obj
+            self._playing_music_mode = "sound"
+            print(f"[debug music] Playing Sound for {which}")
         except Exception as e:
-            print(f"[music] failed to load/play {which} ({music_obj}): {e}")
+            print(f"[music] failed to play Sound for {which}: {e}")
 
     def _maybe_play_select_sound(self):
         snd = getattr(self, "select_sound", None)
@@ -225,27 +249,49 @@ class Game:
         self.state = "ended"
 
     def reset(self):
-        self.rope = Rope(self.width, self.height)
-        # re-align rope and reset clone usage on reset
+        # reset game state for new round and return to menu
         try:
-            self.rope.y = self.left.y
-            self.left.clone_used = False
-            self.right.clone_used = False
-        except Exception:
-            pass
-        self.left.pull = 0
-        self.right.pull = 0
-        self.game_over = False
-        self.winner = None
-        self.left_prev_pull = 0
-        self.right_prev_pull = 0
-        self.state = "waiting"
+            self.game_over = False
+            self.winner = None
+            self.state = "waiting"  # return to menu
+            try:
+                self.rope.reset()
+            except Exception:
+                pass
+            try:
+                self.left.reset()
+            except Exception:
+                pass
+            try:
+                self.right.reset()
+            except Exception:
+                pass
 
-        # switch back to menu music
-        try:
-            self._set_music("menu")
+            # reset bomb and freeze states
+            try:
+                self.left.bomb_used = False
+                self.left.freeze_timer = 0
+            except Exception:
+                pass
+            try:
+                self.right.bomb_used = False
+                self.right.freeze_timer = 0
+            except Exception:
+                pass
+
+            # reset projectiles and effects
+            self.projectiles = []
+            self.effects = []
+
+            # switch back to menu music
+            try:
+                self._set_music("menu")
+            except Exception:
+                pass
+
         except Exception:
-            pass
+            # ensure we at least go back to menu to avoid quitting
+            self.state = "waiting"
 
     def draw_menu(self):
         self.screen.fill((18, 18, 30))
@@ -529,7 +575,7 @@ class Game:
                 for e in self.effects:
                     e.draw(self.screen)
 
-                # draw projectiles (bombs)
+                # draw projectiles (bombs) - invisible for now
                 for p in self.projectiles:
                     p.draw(self.screen)
 

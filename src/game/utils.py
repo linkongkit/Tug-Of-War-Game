@@ -61,10 +61,18 @@ def play_sound(sound, volume=1.0):
 
 # --- music helpers ---
 
-def load_music(name):
-    """Return full path to a music file in src/assets/music/ or None if missing."""
-    path = os.path.join(ASSETS_DIR, "music", name)
-    return path if os.path.isfile(path) else None
+def load_music(filename):
+    """Load music file path for pygame.mixer.music."""
+    try:
+        path = os.path.join("src", "assets", "music", filename)
+        if os.path.exists(path):
+            return path  # return path for pygame.mixer.music
+        else:
+            print(f"[load_music] File not found: {path}")
+            return None
+    except Exception as e:
+        print(f"[load_music] Error loading {filename}: {e}")
+        return None
 
 def play_music(path, loops=-1, volume=0.6):
     """Play background music from a file path (uses pygame.mixer.music)."""

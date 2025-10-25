@@ -19,6 +19,9 @@ def main():
     gameplay_music = load_music("gameplay.wav")
     clone_sound = load_sound("clone-smoke.wav")
 
+    print(f"[debug] menu_music loaded: {menu_music is not None}, type: {type(menu_music)}")
+    print(f"[debug] gameplay_music loaded: {gameplay_music is not None}, type: {type(gameplay_music)}")
+
     # per-track target volumes (0.0 .. 1.0)
     menu_volume = 0.4      # tune menu music
     gameplay_volume = 0.6   # tune gameplay music
@@ -47,7 +50,7 @@ def main():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Tug Of War - Prototype")
 
-    game = Game(screen, WIDTH, HEIGHT, ai=False)
+    game = Game(screen, WIDTH, HEIGHT, ai=True)  # default to 1 player mode
     game.pull_sound = pull_sound
     game.win_sound = win_sound
     game.select_sound = select_sound
