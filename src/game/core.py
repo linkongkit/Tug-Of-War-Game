@@ -533,6 +533,16 @@ class Game:
                 self.left.update()
                 self.right.update()
 
+                # DEBUG: compare pull values, strengths, stamina and timers
+                try:
+                    print(
+                        "[debug pulls] "
+                        f"left.pull={self.left.pull:.2f} left.str={getattr(self.left,'pull_strength',None)} left.stam={getattr(self.left,'stamina',None)} left.tap={getattr(self.left,'tap_timer',0)} "
+                        f"right.pull={self.right.pull:.2f} right.str={getattr(self.right,'pull_strength',None)} right.stam={getattr(self.right,'stamina',None)} right.ai_burst={getattr(self.right,'ai_burst_timer',0)}"
+                    )
+                except Exception:
+                    pass
+
                 # --- SIMPLE AI RANDOM ACTIONS (1-player only) ---
                 if getattr(self, "ai_enabled", False):
                     try:

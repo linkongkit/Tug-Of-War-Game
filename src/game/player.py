@@ -58,7 +58,9 @@ class Player:
         self.stamina_regen = 0.6
 
         # AI timers / params
-        self.ai_aggressiveness = 0.25
+        # Keep pull strength identical for both players so pulls are fair.
+        # Side-specific difficulty should be expressed via ai_aggressiveness and timers only.
+        self.ai_aggressiveness = 0.95
         self.ai_burst_timer = 0
         self.ai_pause_timer = 0
 
@@ -239,19 +241,31 @@ class Player:
         else:
             condition = rope_pos < (rope_center - threshold)
 
-        respond_bias = 0.15 if opponent_pull == 0 else 0.35
+        # higher base chance to start bursts, but keep bursts short so no long holds
+        respond_bias = 0.45 if opponent_pull == 0 else 0.7
 
         if self.ai_pause_timer == 0:
-            chance = self.ai_aggressiveness + respond_bias
+            chance = min(1.0, self.ai_aggressiveness + respond_bias)
             if condition and random.random() < chance:
-                self.ai_burst_timer = random.randint(4, 12)
-                self.ai_pause_timer = random.randint(8, 24)
+                # SHORT burst lengths, very brief pauses => frequent short pulls
+                self.ai_burst_timer = random.randint(1, 4)   # very short bursts
+                self.ai_pause_timer = random.randint(1, 6)   # short pause
                 return
 
-        if opponent_pull == 0 and random.random() < 0.02:
-            self.ai_burst_timer = random.randint(3, 8)
-            self.ai_pause_timer = random.randint(6, 20)
+        # higher opportunistic short-burst chance when opponent not pulling
+        if opponent_pull == 0 and random.random() < 0.18:
+            self.ai_burst_timer = random.randint(1, 4)
+            self.ai_pause_timer = random.randint(1, 6)
             return
+
+        # small increased chance for specials (still single-use per round)
+        if not getattr(self, "clone_used", False) and not getattr(self, "clone_active", False):
+            if random.random() < (0.012 if self.side == "right" else 0.008):
+                self.ai_wants_clone = True
+
+        if not getattr(self, "bomb_used", False):
+            if random.random() < (0.008 if self.side == "right" else 0.003):
+                self.ai_wants_bomb = True
 
     def draw(self, surface):
         img = None

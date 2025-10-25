@@ -61,6 +61,12 @@ def main():
     game.gameplay_volume = gameplay_volume
     game.clone_sound = clone_sound
 
+    # debug: verify pull_strength parity
+    try:
+        print(f"[debug] pull_strength -> left: {game.left.pull_strength}, right: {game.right.pull_strength}")
+    except Exception:
+        pass
+
     # start menu music if available
     try:
         game._set_music("menu")
