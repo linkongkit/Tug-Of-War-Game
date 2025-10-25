@@ -4,6 +4,7 @@ from .player import Player
 from .rope import Rope
 from .utils import load_image, load_sound, load_music
 from game.effects import SpriteEffect, load_sequence
+from game.projectile import Bomb
 
 def load_sequence(folder_name, pad=3):
     """Load frames named folder_name/frame_###.png from sprites folder."""
@@ -87,6 +88,9 @@ class Game:
 
         # active particle/effect list
         self.effects = []
+
+        # active projectiles (bombs)
+        self.projectiles = []
 
         clone_sound = load_sound("clone-smoke.wav")
         if clone_sound:
@@ -345,6 +349,24 @@ class Game:
             eff = SpriteEffect(x, y, frames_used, frame_rate=frame_rate)
             self.effects.append(eff)
 
+    def spawn_bomb(self, thrower, target, travel_time_frames=60):
+        """Spawn a bomb from thrower aimed at target."""
+        if not thrower or not target or getattr(thrower, "bomb_used", False):
+            return
+        sx = thrower.x + thrower.width // 2
+        sy = thrower.y - (thrower.height * 0.1)
+        tx = target.x + target.width // 2
+        ty = target.y
+        dx = tx - sx
+        dy = ty - sy
+        T = float(max(10, travel_time_frames))
+        g = 0.4
+        vx = dx / T
+        vy = (dy - 0.5 * g * T * T) / T
+        bomb = Bomb(sx, sy, vx, vy, gravity=g)
+        self.projectiles.append(bomb)
+        thrower.bomb_used = True
+
     def run(self):
         while True:
             # capture previous pulls for sound detection
@@ -414,6 +436,21 @@ class Game:
                                         self.clone_sound.play()
                             except Exception:
                                 pass
+
+                    # bomb throw: D -> left throws to right; J -> right throws to left
+                    if event.key == pygame.K_d:
+                        try:
+                            if not getattr(self.left, "bomb_used", False) and getattr(self.left, "freeze_timer", 0) == 0:
+                                self.spawn_bomb(self.left, self.right, travel_time_frames=60)
+                        except Exception:
+                            pass
+
+                    if event.key == pygame.K_j:
+                        try:
+                            if not getattr(self.right, "bomb_used", False) and getattr(self.right, "freeze_timer", 0) == 0:
+                                self.spawn_bomb(self.right, self.left, travel_time_frames=60)
+                        except Exception:
+                            pass
 
             # handle menu selection flicker countdown (if active)
             if self.menu_flicker_timer > 0:
@@ -492,11 +529,44 @@ class Game:
                 for e in self.effects:
                     e.draw(self.screen)
 
+                # draw projectiles (bombs)
+                for p in self.projectiles:
+                    p.draw(self.screen)
+
             # update effects
             for e in self.effects:
                 e.update()
             # remove finished
             self.effects = [e for e in self.effects if not e.finished]
+
+            # update projectiles and handle collisions
+            for p in list(self.projectiles):
+                try:
+                    p.update()
+                    if p.alive and not p.exploded:
+                        r = p.get_rect()
+                        if p.vx > 0:
+                            # collision with right player
+                            target_rect = pygame.Rect(self.right.x, self.right.y - self.right.height//2, self.right.width, self.right.height)
+                            if r.colliderect(target_rect):
+                                self.right.apply_bomb_hit(freeze_frames=120)
+                                p.exploded = True
+                                p.alive = False
+                        else:
+                            # collision with left player
+                            target_rect = pygame.Rect(self.left.x, self.left.y - self.left.height//2, self.left.width, self.left.height)
+                            if r.colliderect(target_rect):
+                                self.left.apply_bomb_hit(freeze_frames=120)
+                                p.exploded = True
+                                p.alive = False
+                    # remove offscreen or exploded
+                    if not p.alive or p.offscreen(self.width, self.height):
+                        try:
+                            self.projectiles.remove(p)
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
 
             # (display flip / tick follows)
             pygame.display.flip()

@@ -70,6 +70,13 @@ class Player:
         self.clone_cooldown = 180   # 3 seconds at 60fps
         self.clone_cooldown_timer = 0
 
+        # bomb: single-use per round
+        self.bomb_used = False
+
+        # freeze (when hit by bomb): frames remaining frozen
+        self.freeze_timer = 0
+        self.freeze_duration_frames = 120  # 2 seconds @60fps
+
         # --- LOAD SIDE-SPECIFIC SPRITES (explicit, prefer exact files) ---
         if self.side == "left":
             push_name = "girl-push.png"
@@ -132,6 +139,9 @@ class Player:
         self.effects = []
 
     def press_pull(self):
+        # cannot pull if frozen
+        if self.freeze_timer > 0:
+            return
         if self.stamina > 0:
             self.tap_timer = self.tap_duration
 
@@ -162,6 +172,12 @@ class Player:
         # cooldown tick down
         if self.clone_cooldown_timer > 0:
             self.clone_cooldown_timer -= 1
+
+        # handle freeze timer
+        if self.freeze_timer > 0:
+            self.freeze_timer -= 1
+            if self.freeze_timer <= 0:
+                pass  # thawed
 
         if self.tap_timer > 0:
             self.tap_timer -= 1
@@ -277,3 +293,13 @@ class Player:
                                 self.clone_sound.play()
                     except Exception:
                         pass
+
+    def apply_bomb_hit(self, freeze_frames=None):
+        """Called when this player is hit by a bomb."""
+        if freeze_frames is None:
+            freeze_frames = self.freeze_duration_frames
+        self.freeze_timer = freeze_frames
+        # cancel any active actions
+        self.tap_timer = 0
+        self.ai_burst_timer = 0
+        self.ai_pause_timer = 0
