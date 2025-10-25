@@ -6,6 +6,47 @@ from .utils import load_image, load_sound, load_music
 from game.projectile import Bomb
 import random
 
+# Minimal SpriteEffect implementation used by spawn_effect.
+# Provides update(), draw() and finished flag so effects list in Game works.
+class SpriteEffect:
+    def __init__(self, x, y, frames, frame_rate=12):
+        # x,y are screen coordinates (center)
+        self.x = int(x)
+        self.y = int(y)
+        # store frames (list of pygame.Surface)
+        self.frames = list(frames) if frames is not None else []
+        # frame_rate is number of game ticks per frame (must be >=1)
+        try:
+            self.frame_rate = max(1, int(frame_rate))
+        except Exception:
+            self.frame_rate = 12
+        self._tick = 0
+        self._index = 0
+        self.finished = False
+
+    def update(self):
+        if self.finished or not self.frames:
+            return
+        self._tick += 1
+        if self._tick >= self.frame_rate:
+            self._tick = 0
+            self._index += 1
+            if self._index >= len(self.frames):
+                # mark finished and clamp index to last frame
+                self.finished = True
+                self._index = max(0, len(self.frames) - 1)
+
+    def draw(self, surface):
+        if not self.frames or surface is None:
+            return
+        try:
+            img = self.frames[self._index]
+            rect = img.get_rect(center=(self.x, self.y))
+            surface.blit(img, rect)
+        except Exception:
+            # safe no-op on any drawing error
+            pass
+
 def load_sequence(folder_name, pad=3):
     """Load frames named folder_name/frame_###.png from sprites folder."""
     frames = []
@@ -532,6 +573,42 @@ class Game:
                 # update players
                 self.left.update()
                 self.right.update()
+
+                # Spawn clone effect + sound when a player activates clone (both human & AI)
+                try:
+                    for player in (self.left, self.right):
+                        if getattr(player, "clone_active", False) and not getattr(player, "clone_effect_spawned", False):
+                            # place effect at the clone's position (match Player.draw clone offset),
+                            # not at the main character center.
+                            try:
+                                center_x = player.x + player.width // 2
+                                offset_x = int(player.width * 0.8)
+                                if getattr(player, "side", "") == "left":
+                                    fx = center_x + offset_x - 2
+                                else:
+                                    fx = center_x - offset_x + 2
+                                fy = player.y
+
+                                # spawn effect scaled to player height if supported
+                                try:
+                                    self.spawn_effect(fx, fy, target_h=player.height)
+                                except TypeError:
+                                    self.spawn_effect(fx, fy)
+                            except Exception:
+                                # fallback to player center if anything fails
+                                try:
+                                    self.spawn_effect(player.x + player.width // 2, player.y, target_h=player.height)
+                                except Exception:
+                                    pass
+
+                            if getattr(self, "clone_sound", None):
+                                try:
+                                    self.clone_sound.play()
+                                except Exception:
+                                    pass
+                            player.clone_effect_spawned = True
+                except Exception:
+                    pass
 
                 # DEBUG: compare pull values, strengths, stamina and timers
                 try:
