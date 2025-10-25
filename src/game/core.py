@@ -3,8 +3,8 @@ import pygame
 from .player import Player
 from .rope import Rope
 from .utils import load_image, load_sound, load_music
-from game.effects import SpriteEffect, load_sequence
 from game.projectile import Bomb
+import random
 
 def load_sequence(folder_name, pad=3):
     """Load frames named folder_name/frame_###.png from sprites folder."""
@@ -283,6 +283,7 @@ class Game:
             self.projectiles = []
             self.effects = []
 
+            print("[debug core] reset called - switching to menu and clearing flags")
             # switch back to menu music
             try:
                 self._set_music("menu")
@@ -412,6 +413,7 @@ class Game:
         bomb = Bomb(sx, sy, vx, vy, gravity=g)
         self.projectiles.append(bomb)
         thrower.bomb_used = True
+        print(f"[debug core] spawn_bomb from={thrower.side} to={target.side} vx={vx:.2f} vy={vy:.2f} travel_frames={T}")
 
     def run(self):
         while True:
@@ -516,15 +518,59 @@ class Game:
             if self.state == "waiting":
                 self.draw_menu()
             elif not self.game_over:
-                # Left human updates
-                self.left.update()
+                # ---- AI decision step: call ai_act BEFORE update so bursts apply immediately ----
+                if getattr(self, "ai_enabled", False):
+                    try:
+                        rope_pos = getattr(self.rope, "pos", 0.5)
+                        rope_center = 0.5
+                        # call ai_act on right player (1-player mode)
+                        if getattr(self.right, "ai_act", None):
+                            self.right.ai_act(rope_pos, rope_center, opponent_pull=getattr(self.left, "pull", 0))
+                    except Exception:
+                        pass
 
-                # Right: AI or human
-                if self.ai_enabled:
-                    self.right.ai_act(self.rope.pos, self.width // 2, opponent_pull=prev_left)
-                    self.right.update()
-                else:
-                    self.right.update()
+                # update players
+                self.left.update()
+                self.right.update()
+
+                # --- SIMPLE AI RANDOM ACTIONS (1-player only) ---
+                if getattr(self, "ai_enabled", False):
+                    try:
+                        # AI random clone
+                        if (not getattr(self.right, "clone_used", False)
+                                and getattr(self.right, "clone_cooldown_timer", 0) == 0
+                                and getattr(self.right, "freeze_timer", 0) == 0
+                                and random.random() < 0.004):
+                            try:
+                                if self.right.activate_clone():
+                                    fx = self.right.x + self.right.width // 2 - int(self.right.width * 0.6) - 5
+                                    fy = self.right.y
+                                    try:
+                                        self.spawn_effect(fx, fy, target_h=self.right.height)
+                                    except Exception:
+                                        pass
+                                    if getattr(self, "clone_sound", None):
+                                        try:
+                                            self.clone_sound.play()
+                                        except Exception:
+                                            pass
+                                    print(f"[debug core] AI clone executed for right player")
+                            except Exception:
+                                pass
+
+                        # AI random bomb
+                        if (not getattr(self.right, "bomb_used", False)
+                                and getattr(self.right, "freeze_timer", 0) == 0
+                                and random.random() < 0.002):
+                            try:
+                                self.spawn_bomb(self.right, self.left, travel_time_frames=60)
+                                print(f"[debug core] AI bomb spawned from right")
+                            except Exception:
+                                pass
+
+                    except Exception:
+                        pass
+                # --- end AI random actions ---
 
                 # play pull-start sound if someone just started pulling
                 if self.left.pull > 0 and prev_left == 0:

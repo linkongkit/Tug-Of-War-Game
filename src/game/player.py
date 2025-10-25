@@ -65,19 +65,17 @@ class Player:
         # clone / special
         self.clone_active = False
         self.clone_timer = 0
-        self.clone_duration = 60  # frames (60 = 1 second at 60fps)
+        self.clone_duration = 60
         self.clone_used = False
-
-        # allow repeated uses with cooldown (frames)
-        self.clone_cooldown = 180   # 3 seconds at 60fps
+        self.clone_cooldown = 180
         self.clone_cooldown_timer = 0
 
-        # bomb: single-use per round
+        # bomb
         self.bomb_used = False
 
-        # freeze (when hit by bomb): frames remaining frozen
+        # freeze when hit by bomb
         self.freeze_timer = 0
-        self.freeze_duration_frames = 120  # 2 seconds @60fps
+        self.freeze_duration_frames = 120
 
         # --- LOAD SIDE-SPECIFIC SPRITES (explicit, prefer exact files) ---
         if self.side == "left":
@@ -151,16 +149,10 @@ class Player:
         """Trigger a temporary clone in front of the player (visual) that doubles pull.
            Only activates once per round (clone_used prevents re-use).
         """
-        if self.clone_active:
+        if self.clone_active or self.clone_used:
             return False
-        # block if already used this round
-        if self.clone_used:
-            return False
-        if frames is None:
-            frames = self.clone_duration
         self.clone_active = True
-        self.clone_timer = frames
-        # mark as used (one chance only)
+        self.clone_timer = frames if frames is not None else self.clone_duration
         self.clone_used = True
         # start cooldown after activation
         self.clone_cooldown_timer = self.clone_cooldown
