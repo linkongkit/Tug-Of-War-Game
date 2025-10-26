@@ -103,8 +103,6 @@ class Player:
                 print(f"[player] {self.side}: using fallback push image {fallback}")
             else:
                 print(f"[player] WARNING: no push image for {self.side} (tried {push_name} and {fallback})")
-        else:
-            print(f"[player] {self.side}: loaded push image {push_name}")
 
         if self.pull_img is None:
             fallback = "boy-pull.png" if self.side == "left" else "girl-pull.png"
@@ -117,7 +115,9 @@ class Player:
             else:
                 print(f"[player] WARNING: no pull image for {self.side} (tried {pull_name} and {fallback})")
         else:
-            print(f"[player] {self.side}: loaded pull image {pull_name}")
+            if self.pull_img is None:
+                # Load default pull image or handle error
+                pass  # Add your code here if needed
 
         # scale images to player size
         if self.push_img and self.push_img.get_size() != (self.width, self.height):

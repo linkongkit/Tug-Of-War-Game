@@ -152,7 +152,7 @@ class Game:
             music_obj = None
         vol = getattr(self, f"{which}_volume", None)
 
-        print(f"[debug music] request set {which}: obj={music_obj}, vol={vol}")
+        
 
         # stop mixer music first
         try:
@@ -184,7 +184,6 @@ class Game:
                     pygame.mixer.music.set_volume(vol)
                 pygame.mixer.music.play(-1)
                 self._playing_music_mode = "mixer"
-                print(f"[debug music] Loaded and playing {which}: {music_obj}")
             except Exception as e:
                 print(f"[music] failed to load/play {which} ({music_obj}): {e}")
             return
@@ -199,7 +198,6 @@ class Game:
             music_obj.play(-1)
             self._playing_music_sound = music_obj
             self._playing_music_mode = "sound"
-            print(f"[debug music] Playing Sound for {which}")
         except Exception as e:
             print(f"[music] failed to play Sound for {which}: {e}")
 
@@ -324,7 +322,6 @@ class Game:
             self.projectiles = []
             self.effects = []
 
-            print("[debug core] reset called - switching to menu and clearing flags")
             # switch back to menu music
             try:
                 self._set_music("menu")
@@ -454,7 +451,6 @@ class Game:
         bomb = Bomb(sx, sy, vx, vy, gravity=g)
         self.projectiles.append(bomb)
         thrower.bomb_used = True
-        print(f"[debug core] spawn_bomb from={thrower.side} to={target.side} vx={vx:.2f} vy={vy:.2f} travel_frames={T}")
 
     def run(self):
         while True:
@@ -612,11 +608,12 @@ class Game:
 
                 # DEBUG: compare pull values, strengths, stamina and timers
                 try:
-                    print(
-                        "[debug pulls] "
-                        f"left.pull={self.left.pull:.2f} left.str={getattr(self.left,'pull_strength',None)} left.stam={getattr(self.left,'stamina',None)} left.tap={getattr(self.left,'tap_timer',0)} "
-                        f"right.pull={self.right.pull:.2f} right.str={getattr(self.right,'pull_strength',None)} right.stam={getattr(self.right,'stamina',None)} right.ai_burst={getattr(self.right,'ai_burst_timer',0)}"
-                    )
+                    # gather debug info without printing to avoid spamming tests;
+                    # keep as a local tuple so the block is not empty and safe to run.
+                    left_info = (self.left.pull, getattr(self.left, "pull_strength", None), getattr(self.left, "stamina", None))
+                    right_info = (self.right.pull, getattr(self.right, "pull_strength", None), getattr(self.right, "stamina", None))
+                    # assign to a temporary variable to avoid lint warnings
+                    _debug_snapshot = (left_info, right_info)
                 except Exception:
                     pass
 
@@ -641,7 +638,6 @@ class Game:
                                             self.clone_sound.play()
                                         except Exception:
                                             pass
-                                    print(f"[debug core] AI clone executed for right player")
                             except Exception:
                                 pass
 
@@ -651,7 +647,6 @@ class Game:
                                 and random.random() < 0.002):
                             try:
                                 self.spawn_bomb(self.right, self.left, travel_time_frames=60)
-                                print(f"[debug core] AI bomb spawned from right")
                             except Exception:
                                 pass
 

@@ -2,6 +2,8 @@ import sys
 import pygame
 import random
 import os
+import warnings
+warnings.filterwarnings("ignore", message="iCCP: known incorrect sRGB profile")
 from game.core import Game
 from game.utils import init_audio, load_sound, load_music, load_image
 
@@ -18,9 +20,6 @@ def main():
     menu_music = load_music("menu.wav")
     gameplay_music = load_music("gameplay.wav")
     clone_sound = load_sound("clone-smoke.wav")
-
-    print(f"[debug] menu_music loaded: {menu_music is not None}, type: {type(menu_music)}")
-    print(f"[debug] gameplay_music loaded: {gameplay_music is not None}, type: {type(gameplay_music)}")
 
     # per-track target volumes (0.0 .. 1.0)
     menu_volume = 0.4      # tune menu music
@@ -60,12 +59,6 @@ def main():
     game.menu_volume = menu_volume
     game.gameplay_volume = gameplay_volume
     game.clone_sound = clone_sound
-
-    # debug: verify pull_strength parity
-    try:
-        print(f"[debug] pull_strength -> left: {game.left.pull_strength}, right: {game.right.pull_strength}")
-    except Exception:
-        pass
 
     # start menu music if available
     try:
