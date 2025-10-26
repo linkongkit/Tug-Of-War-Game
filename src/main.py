@@ -20,6 +20,7 @@ def main():
     menu_music = load_music("menu.wav")
     gameplay_music = load_music("gameplay.wav")
     clone_sound = load_sound("clone-smoke.wav")
+    explosion_sound = load_sound("explosion.wav")  # Load explosion sound
 
     # per-track target volumes (0.0 .. 1.0)
     menu_volume = 0.4      # tune menu music
@@ -45,6 +46,8 @@ def main():
         select_sound.set_volume(1.0)
     if clone_sound:
         clone_sound.set_volume(1.0)
+    if explosion_sound:
+        explosion_sound.set_volume(1.0)  # Set volume for explosion sound
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Tug Of War - Prototype")
@@ -59,6 +62,13 @@ def main():
     game.menu_volume = menu_volume
     game.gameplay_volume = gameplay_volume
     game.clone_sound = clone_sound
+    game.explosion_sound = explosion_sound  # Pass to game
+
+    # debug: verify pull_strength parity
+    try:
+        print(f"[debug] pull_strength -> left: {game.left.pull_strength}, right: {game.right.pull_strength}")
+    except Exception:
+        pass
 
     # start menu music if available
     try:

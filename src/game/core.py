@@ -173,7 +173,6 @@ class Game:
             pass
 
         if not music_obj:
-            print(f"[music] no {which}_music loaded")
             return
 
         # If load_music returned a filename/path, use pygame.mixer.music
@@ -724,6 +723,8 @@ class Game:
                             target_rect = pygame.Rect(self.right.x, self.right.y - self.right.height//2, self.right.width, self.right.height)
                             if r.colliderect(target_rect):
                                 self.right.apply_bomb_hit(freeze_frames=120)
+                                if hasattr(self, 'explosion_sound') and self.explosion_sound:
+                                    self.explosion_sound.play()  # Play explosion sound on hit
                                 p.exploded = True
                                 p.alive = False
                         else:
@@ -731,6 +732,8 @@ class Game:
                             target_rect = pygame.Rect(self.left.x, self.left.y - self.left.height//2, self.left.width, self.left.height)
                             if r.colliderect(target_rect):
                                 self.left.apply_bomb_hit(freeze_frames=120)
+                                if hasattr(self, 'explosion_sound') and self.explosion_sound:
+                                    self.explosion_sound.play()  # Play explosion sound on hit
                                 p.exploded = True
                                 p.alive = False
                     # remove offscreen or exploded
