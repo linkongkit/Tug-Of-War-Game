@@ -61,7 +61,7 @@ def load_sequence(folder_name, pad=3):
     return frames
 
 class Game:
-    def __init__(self, screen=None, width=800, height=480, ai=False):
+    def __init__(self, screen, width, height, ai=False):
         self.screen = screen
         # store passed sizes
         self.width = width
@@ -72,10 +72,12 @@ class Game:
         self.clock = pygame.time.Clock()
 
         # create players (use self.height for vertical center)
-        left_margin = 70
-        self.left = Player('left', x=left_margin, y=self.height // 2 + 20)
-        # create right player then set its x so its center mirrors the left player's center
-        self.right = Player('right', x=0, y=self.height // 2 + 20)
+        player_width = 80
+        player_height = 120
+        left_margin = 100
+        right_margin = width - 100 - player_width
+        self.left = Player(left_margin, self.height // 2 + 20, player_width, player_height, 'left', 'boy-push.png', 'boy-pull.png')
+        self.right = Player(right_margin, self.height // 2 + 20, player_width, player_height, 'right', 'girl-push.png', 'girl-pull.png')
         left_center = left_margin + (self.left.width // 2)
         right_center = self.width - left_center
         self.right.x = int(right_center - (self.right.width // 2))
@@ -714,37 +716,108 @@ class Game:
 
             # update projectiles and handle collisions
             for p in list(self.projectiles):
-                try:
-                    p.update()
-                    if p.alive and not p.exploded:
-                        r = p.get_rect()
-                        if p.vx > 0:
-                            # collision with right player
-                            target_rect = pygame.Rect(self.right.x, self.right.y - self.right.height//2, self.right.width, self.right.height)
-                            if r.colliderect(target_rect):
-                                self.right.apply_bomb_hit(freeze_frames=120)
-                                if hasattr(self, 'explosion_sound') and self.explosion_sound:
-                                    self.explosion_sound.play()  # Play explosion sound on hit
-                                p.exploded = True
-                                p.alive = False
-                        else:
-                            # collision with left player
-                            target_rect = pygame.Rect(self.left.x, self.left.y - self.left.height//2, self.left.width, self.left.height)
-                            if r.colliderect(target_rect):
-                                self.left.apply_bomb_hit(freeze_frames=120)
-                                if hasattr(self, 'explosion_sound') and self.explosion_sound:
-                                    self.explosion_sound.play()  # Play explosion sound on hit
-                                p.exploded = True
-                                p.alive = False
-                    # remove offscreen or exploded
-                    if not p.alive or p.offscreen(self.width, self.height):
-                        try:
-                            self.projectiles.remove(p)
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                p.update()
+                if p.alive and not p.exploded:
+                    r = p.get_rect()
+                    if p.vx > 0:
+                        target = pygame.Rect(self.right.x, self.right.y - self.right.height, self.right.width, self.right.height)
+                        if r.colliderect(target):
+                            self.right.apply_bomb_hit(freeze_frames=120)
+                            if getattr(self, "explosion_sound", None):
+                                self.explosion_sound.play()
+                            p.exploded = True
+                            p.alive = False
+                    else:
+                        target = pygame.Rect(self.left.x, self.left.y - self.left.height, self.left.width, self.left.height)
+                        if r.colliderect(target):
+                            self.left.apply_bomb_hit(freeze_frames=120)
+                            if getattr(self, "explosion_sound", None):
+                                self.explosion_sound.play()
+                            p.exploded = True
+                            p.alive = False
+                if not p.alive or p.offscreen(self.width, self.height):
+                    try:
+                        self.projectiles.remove(p)
+                    except Exception:
+                        pass
 
             # (display flip / tick follows)
             pygame.display.flip()
             self.clock.tick(60)
+
+class Projectile:
+    def __init__(self, x, y, vx, vy):
+        import os
+        import pygame
+        self.x = x
+        self.y = y
+        self.vx = vx
+        self.vy = vy
+        self.alive = True
+        self.exploded = False
+        self._image_name = None
+        self.image = None
+
+        # candidates to try
+        sprites_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "assets", "sprites"))
+        candidates = [
+            os.path.join(sprites_dir, "bomb.png"),
+            os.path.join(sprites_dir, "bomb0.png"),
+            os.path.join(sprites_dir, "projectile.png"),
+            os.path.join(sprites_dir, "missile.png"),
+            "bomb.png",
+        ]
+
+        # try each candidate and print debug info about existence + load error
+        for path in candidates:
+            try:
+                exists = os.path.exists(path)
+            except Exception:
+                exists = False
+            print(f"[debug] Projectile: trying path={path} exists={exists}")
+            if not exists:
+                continue
+            try:
+                img = pygame.image.load(path)
+                try:
+                    img = img.convert_alpha()
+                except Exception:
+                    img = img.convert()
+                self.image = img
+                self._image_name = path
+                print(f"[debug] Projectile: loaded image {path}")
+                break
+            except Exception as e:
+                print(f"[debug] Projectile: failed to load {path}: {e}")
+
+        # fallback: try helper load_image (may search by basename)
+        if not self.image:
+            try:
+                img = load_image("bomb.png")
+                if img:
+                    self.image = img
+                    self._image_name = "bomb.png (via load_image)"
+                    print(f"[debug] Projectile: loaded bomb.png via load_image")
+            except Exception as e:
+                print(f"[debug] Projectile: load_image raised: {e}")
+
+        # final fallback placeholder
+        if not self.image:
+            print("[debug] Projectile: using placeholder gray circle")
+            surf = pygame.Surface((16, 16), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (180, 180, 180), (8, 8), 6)
+            self.image = surf
+            self._image_name = "<placeholder>"
+
+        # set rect centered on spawn pos
+        try:
+            self.rect = self.image.get_rect(center=(int(self.x), int(self.y)))
+        except Exception:
+            self.rect = pygame.Rect(int(self.x), int(self.y), 12, 12)
+
+# helper used in debug print to avoid NameError if not defined elsewhere
+def _safe(s):
+    try:
+        return s
+    except Exception:
+        return "<unknown>"

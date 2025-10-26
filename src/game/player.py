@@ -1,44 +1,10 @@
 import pygame
 import random
 from game.utils import load_image
-from game.effects import load_sequence
-
-class SpriteEffect:
-    """
-    Minimal effect/animation wrapper used by Player.spawn_effect.
-    Holds a list of frames (surfaces), a frame rate and exposes update/draw.
-    """
-    def __init__(self, x, y, frames, frame_rate=12):
-        self.x = x
-        self.y = y
-        self.frames = frames or []
-        self.frame_rate = frame_rate
-        # timer counts ticks; advance every ticks_per_frame
-        self.ticks_per_frame = max(1, int(60 / max(1, frame_rate)))
-        self.timer = 0
-        self.index = 0
-        self.finished = not bool(self.frames)
-
-    def update(self):
-        if self.finished:
-            return
-        self.timer += 1
-        if self.timer >= self.ticks_per_frame:
-            self.timer = 0
-            self.index += 1
-            if self.index >= len(self.frames):
-                self.finished = True
-                self.index = max(0, len(self.frames) - 1)
-
-    def draw(self, surface):
-        if self.finished or not self.frames:
-            return
-        img = self.frames[self.index]
-        rect = img.get_rect(center=(self.x, self.y))
-        surface.blit(img, rect)
+from game.effects import ExplosionAnim, load_sequence
 
 class Player:
-    def __init__(self, side, x=0, y=0):
+    def __init__(self, x, y, width, height, side, push_img_path, pull_img_path):
         self.side = side
         self.x = x
         self.y = y
@@ -139,6 +105,10 @@ class Player:
 
         # active particle/effect list
         self.effects = []
+        # explosion setup: reduced duration for faster animation
+        self.explosion_frames = load_sequence("explosion", 6)
+        self.explosion_duration = 60  # reduced for smoother timing
+        self.explosion_anim = None
 
     def press_pull(self):
         # cannot pull if frozen
@@ -160,17 +130,19 @@ class Player:
         self.clone_cooldown_timer = self.clone_cooldown
         return True
 
-    def apply_bomb_hit(self, freeze_frames=None):
-        """Called when this player is hit by a bomb."""
-        if freeze_frames is None:
-            freeze_frames = self.freeze_duration_frames
+    def apply_bomb_hit(self, freeze_frames=120):
         self.freeze_timer = freeze_frames
-        # cancel actions/timers and force stop pulling
-        self.tap_timer = 0
-        self.ai_burst_timer = 0
-        # ensure AI does not immediately resume
-        self.ai_pause_timer = max(self.ai_pause_timer, freeze_frames)
-        self.pull = 0
+        self.spawn_explosion()
+
+    def spawn_explosion(self):
+        if not getattr(self, "explosion_frames", None):
+            return
+        cx = self.x + self.width // 2
+        cy = self.y - self.height // 2  # center on player's body
+        # target_size larger for visibility
+        target_w = int(self.width * 2.0)
+        target_h = int(self.height * 2.0)
+        self.explosion_anim = ExplosionAnim(cx, cy, self.explosion_frames, self.explosion_duration, target_size=(target_w, target_h))
 
     def update(self):
         # clone timer
@@ -227,6 +199,11 @@ class Player:
                     self.effects.remove(e)
                 except Exception:
                     pass
+
+        if self.explosion_anim:
+            self.explosion_anim.update()
+            if not self.explosion_anim.alive:
+                self.explosion_anim = None
 
     def ai_act(self, rope_pos, rope_center, opponent_pull=0, threshold=10):
         # do nothing while frozen
@@ -305,6 +282,9 @@ class Player:
         # draw local effects
         for e in self.effects:
             e.draw(surface)
+
+        if self.explosion_anim:
+            self.explosion_anim.draw(surface)
 
     def spawn_effect(self, x, y, kind="clone-smoke", frame_rate=12):
         if kind == "clone-smoke" and self.clone_smoke_frames:

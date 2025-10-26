@@ -63,37 +63,19 @@ def load_music(filename):
     return None
 
 def load_image(filename):
-    """Return a pygame.Surface or None. Searches images and sprites folders."""
+    """
+    Load an image from the assets/sprites directory.
+    """
+    base_dir = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "assets", "sprites"))
+    path = os.path.join(base_dir, filename)
+    print(f"[debug] Attempting to load image from: {path}")  # Debug the path
     try:
-        candidates = [
-            os.path.join("images", filename),
-            os.path.join("sprites", filename),
-            filename,
-        ]
-        for c in candidates:
-            path = os.path.join(ASSET_ROOT, c)
-            if os.path.exists(path) and os.path.isfile(path):
-                try:
-                    surf = pygame.image.load(path)
-                    try:
-                        return surf.convert_alpha()
-                    except Exception:
-                        return surf  # return raw surface if convert fails
-                except Exception:
-                    return None
-        # fallback: try direct path
-        if os.path.exists(filename):
-            try:
-                surf = pygame.image.load(filename)
-                try:
-                    return surf.convert_alpha()
-                except Exception:
-                    return surf
-            except Exception:
-                return None
-    except Exception:
-        pass
-    return None
+        img = pygame.image.load(path).convert_alpha()
+        print(f"[debug] Successfully loaded image: {filename}")
+        return img
+    except Exception as e:
+        print(f"[debug] Failed to load image {filename} from {path}: {e}")
+        return None
 
 def play_sound(sound, volume=1.0):
     """Play a pygame Sound if available."""

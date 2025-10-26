@@ -1,47 +1,61 @@
 import pygame
-from game.utils import load_image
+from .utils import load_image
 
-def load_sequence(folder_name, pad=3):
-    """Load frames from src/assets/sprites/{folder_name}/frame_###.png.
-    Returns list of Surfaces. Stops when a frame is missing.
-    """
+def load_sequence(name, num_frames):
     frames = []
-    i = 0
-    while True:
-        name = f"{folder_name}/frame_{i:0{pad}d}.png"
-        img = load_image(name)
-        if img is None:
-            break
-        frames.append(img)
-        i += 1
+    for i in range(num_frames):
+        fname = f"{name}{i}.png"
+        img = load_image(fname)
+        if img:
+            frames.append(img)
+        else:
+            print(f"[debug] Failed to load {fname}")
+    print(f"[debug] load_sequence('{name}', {num_frames}) -> {len(frames)} frames")
     return frames
 
-class SpriteEffect:
-    """Simple sprite-sequence effect. x,y are center position on screen. frame_rate is FPS."""
-    def __init__(self, x, y, frames, frame_rate=12):
-        self.x = int(x)
-        self.y = int(y)
+class Anim:
+    def __init__(self, x, y, frames, duration):
         self.frames = frames or []
-        self.frame_rate = max(1, int(frame_rate))
-        # game runs ~60 FPS -> how many game-frames each animation frame lasts
-        self.frame_duration = max(1, int(60 / self.frame_rate))
-        self.timer = 0
-        self.index = 0
-        self.finished = False
+        self.duration = max(1, float(duration or 1))
+        self.frame_index = 0
+        self.acc = 0.0
+        # equal time per frame (float for smooth timing)
+        self.per_frame = self.duration / max(1, len(self.frames))
+        self.image = self.frames[0] if self.frames else None
+        self.rect = self.image.get_rect(center=(x, y)) if self.image else pygame.Rect(x, y, 0, 0)
+        self.alive = bool(self.frames)
 
     def update(self):
-        if self.finished or not self.frames:
+        if not self.alive:
             return
-        self.timer += 1
-        if self.timer >= self.frame_duration:
-            self.timer = 0
-            self.index += 1
-            if self.index >= len(self.frames):
-                self.finished = True
+        self.acc += 1.0
+        while self.acc >= self.per_frame:
+            self.acc -= self.per_frame
+            self.frame_index += 1
+            if self.frame_index >= len(self.frames):
+                self.alive = False
+                return
+            self.image = self.frames[self.frame_index]
+            # keep center stable
+            center = self.rect.center
+            self.rect = self.image.get_rect(center=center)
 
     def draw(self, surface):
-        if self.finished or not self.frames:
-            return
-        img = self.frames[self.index]
-        rect = img.get_rect(center=(self.x, self.y))
-        surface.blit(img, rect)
+        if self.alive and self.image:
+            surface.blit(self.image, self.rect)
+
+class ExplosionAnim(Anim):
+    def __init__(self, x, y, frames, duration, scale=None, target_size=None):
+        # compute scale from target_size if provided
+        if target_size and frames:
+            fw, fh = frames[0].get_size()
+            if fw > 0 and fh > 0:
+                sx = float(target_size[0]) / fw
+                sy = float(target_size[1]) / fh
+                scale = max(sx, sy)
+        if scale is not None and scale != 1.0 and frames:
+            frames = [
+                pygame.transform.scale(f, (int(f.get_width() * scale), int(f.get_height() * scale)))
+                for f in frames
+            ]
+        super().__init__(x, y, frames, duration)

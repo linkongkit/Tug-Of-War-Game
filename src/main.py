@@ -4,8 +4,7 @@ import random
 import os
 import warnings
 warnings.filterwarnings("ignore", message="iCCP: known incorrect sRGB profile")
-from game.core import Game
-from game.utils import init_audio, load_sound, load_music, load_image
+from game.utils import init_audio  # keep only init_audio here
 
 WIDTH, HEIGHT = 800, 480
 
@@ -13,6 +12,14 @@ def main():
     # ensure mixer pre-init then init pygame
     init_audio()
     pygame.init()
+
+    # Initialize the display early (must happen before convert_alpha())
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Tug Of War - Prototype")
+
+    # import modules that may load images/assets now that display exists
+    from game.core import Game
+    from game.utils import load_sound, load_music, load_image
 
     pull_sound = load_sound("pull.wav")
     win_sound = load_sound("win.wav")
@@ -23,17 +30,14 @@ def main():
     explosion_sound = load_sound("explosion.wav")  # Load explosion sound
 
     # per-track target volumes (0.0 .. 1.0)
-    menu_volume = 0.4      # tune menu music
-    gameplay_volume = 0.6   # tune gameplay music
+    menu_volume = 0.4
+    gameplay_volume = 0.6
 
-    # reduce menu music volume (0.0 = silent .. 1.0 = full). adjust as desired.
     try:
         if menu_music:
-            # if load_music returned a Sound object
             if isinstance(menu_music, pygame.mixer.Sound):
                 menu_music.set_volume(menu_volume)
             else:
-                # if load_music returned a filename/path used with pygame.mixer.music
                 pygame.mixer.music.set_volume(menu_volume)
     except Exception:
         pass
@@ -47,30 +51,19 @@ def main():
     if clone_sound:
         clone_sound.set_volume(1.0)
     if explosion_sound:
-        explosion_sound.set_volume(1.0)  # Set volume for explosion sound
+        explosion_sound.set_volume(1.0)
 
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Tug Of War - Prototype")
-
-    game = Game(screen, WIDTH, HEIGHT, ai=True)  # default to 1 player mode
+    game = Game(screen, WIDTH, HEIGHT, ai=True)
     game.pull_sound = pull_sound
     game.win_sound = win_sound
     game.select_sound = select_sound
     game.menu_music = menu_music
     game.gameplay_music = gameplay_music
-    # expose desired volumes to the Game instance
     game.menu_volume = menu_volume
     game.gameplay_volume = gameplay_volume
     game.clone_sound = clone_sound
-    game.explosion_sound = explosion_sound  # Pass to game
+    game.explosion_sound = explosion_sound
 
-    # debug: verify pull_strength parity
-    try:
-        print(f"[debug] pull_strength -> left: {game.left.pull_strength}, right: {game.right.pull_strength}")
-    except Exception:
-        pass
-
-    # start menu music if available
     try:
         game._set_music("menu")
     except Exception:
