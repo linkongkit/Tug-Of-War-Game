@@ -142,6 +142,8 @@ class Game:
         # attach clone sound to this Game instance instead of creating a nested Game
         self.clone_sound = clone_sound
 
+        self.running = True  # add this line
+
     def _set_music(self, which):
         """Set background music for 'menu' or 'gameplay' reliably.
 
@@ -454,7 +456,8 @@ class Game:
         thrower.bomb_used = True
 
     def run(self):
-        while True:
+        clock = pygame.time.Clock()
+        while self.running:
             # capture previous pulls for sound detection
             prev_left = self.left.pull
             prev_right = self.right.pull
@@ -743,7 +746,7 @@ class Game:
 
             # (display flip / tick follows)
             pygame.display.flip()
-            self.clock.tick(60)
+            clock.tick(60)  # cap at 60 FPS
 
 class Projectile:
     def __init__(self, x, y, vx, vy):

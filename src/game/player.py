@@ -105,9 +105,10 @@ class Player:
 
         # active particle/effect list
         self.effects = []
-        # explosion setup: duration in milliseconds (e.g. 600ms total for 6 frames -> 100ms/frame)
+        # explicit total explosion time in milliseconds (set small so frames advance)
+        # 300 ms total for 6 frames -> 50 ms per frame
+        self.explosion_duration_ms = 300
         self.explosion_frames = load_sequence("explosion", 6)
-        self.explosion_duration_ms = 600
         self.explosion_anim = None
 
     def press_pull(self):
@@ -134,30 +135,34 @@ class Player:
         self.freeze_timer = freeze_frames
         self.spawn_explosion()
 
-    def spawn_explosion(self):
+    def spawn_explosion(self, y_offset=-30):
         """
-        Spawn explosion centered on the player's visual center (adjusted for sprite baseline).
+        Spawn explosion centered on the player's rect center.
+        y_offset moves it vertically (negative moves up).
         """
         if not getattr(self, "explosion_frames", None):
             return
 
-        # prefer existing rect if present (most accurate). fallback to (x,y,width,height)
-        try:
-            center_x, center_y = self.rect.center
-        except Exception:
-            center_x = int(self.x + self.width / 2)
-            center_y = int(self.y + self.height / 2)
+        # use player rect if available
+        if hasattr(self, "rect") and self.rect:
+            cx, cy = self.rect.center
+        else:
+            cx = int(self.x + self.width / 2)
+            cy = int(self.y + self.height / 2)
 
-        # adjust y_offset to move explosion up (negative = up; positive = down)
-        # increased to -30 for more upward movement; tweak as needed
-        y_offset = -30
-        center_y += y_offset
+        cy += int(y_offset)
 
-        # size explosion relative to player; tweak multiplier as needed
         size = int(max(self.width, self.height) * 1.6)
-        self.explosion_anim = ExplosionAnim(center_x, center_y, self.explosion_frames, self.explosion_duration_ms, target_size=(size, size))
+        # pass explicit duration in milliseconds
+        self.explosion_anim = ExplosionAnim(cx, cy, self.explosion_frames, duration_ms=self.explosion_duration_ms, target_size=(size, size))
 
     def update(self, *args, **kwargs):
+        # always update explosion animation first so timing is continuous
+        if getattr(self, "explosion_anim", None):
+            self.explosion_anim.update()
+            if not self.explosion_anim.alive:
+                self.explosion_anim = None
+
         # clone timer
         if self.clone_timer > 0:
             self.clone_timer -= 1
@@ -213,11 +218,6 @@ class Player:
                 except Exception:
                     pass
 
-        if self.explosion_anim:
-            self.explosion_anim.update()
-            if not self.explosion_anim.alive:
-                self.explosion_anim = None
-
     def ai_act(self, rope_pos, rope_center, opponent_pull=0, threshold=10):
         # do nothing while frozen
         if self.freeze_timer > 0:
@@ -258,7 +258,7 @@ class Player:
                 self.ai_wants_bomb = True
 
     def draw(self, surface):
-        img = None
+        # draw player sprite
         # show pull frame when actively pulling, else ready/push frame if available
         if self.pull > 0 and self.pull_img:
             img = self.pull_img
@@ -296,8 +296,8 @@ class Player:
         for e in self.effects:
             e.draw(surface)
 
-        # draw explosion on top, centered at the adjusted player's center
-        if self.explosion_anim:
+        # draw explosion on top even if player frozen
+        if getattr(self, "explosion_anim", None):
             self.explosion_anim.draw(surface)
 
     def spawn_effect(self, x, y, kind="clone-smoke", frame_rate=12):
@@ -319,3 +319,25 @@ class Player:
         self.ai_pause_timer = 0
         self.pull = 0
         self.effects = []
+
+class Game:
+    def run(self):
+        clock = pygame.time.Clock()
+        fps_timer = pygame.time.get_ticks()
+        frame_count = 0
+
+        while self.running:
+            # ...existing event/update/draw code...
+
+            pygame.display.flip()
+            # cap FPS
+            dt = clock.tick(60)
+            frame_count += 1
+
+            # optional: print FPS once per second
+            now = pygame.time.get_ticks()
+            if now - fps_timer >= 1000:
+                fps = frame_count / ((now - fps_timer) / 1000.0)
+                print(f"[dbg-core] approx fps={fps:.1f} tick_dt={dt}ms")
+                fps_timer = now
+                frame_count = 0
