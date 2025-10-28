@@ -63,10 +63,35 @@ def load_sequence(folder_name, pad=3):
 class Game:
     def __init__(self, screen, width, height, ai=False):
         self.screen = screen
-        # store passed sizes
         self.width = width
         self.height = height
-        self.ai_enabled = ai
+
+        # try common filename variants for the menu background
+        bg_candidates = ["homepage bg.jpg", "homepage-bg.jpg", "homepage_bg.jpg", "homepage.jpg"]
+        self.menu_bg = None
+        for name in bg_candidates:
+            img = load_image(name)
+            if img:
+                self.menu_bg = img
+                print(f"[debug] menu background loaded: {name}")
+                break
+        if self.menu_bg:
+            try:
+                self.menu_bg = pygame.transform.smoothscale(self.menu_bg, (self.width, self.height))
+            except Exception:
+                self.menu_bg = pygame.transform.scale(self.menu_bg, (self.width, self.height))
+        else:
+            print("[debug] menu background not found; checked:", bg_candidates)
+
+        # ensure fonts available for menu text
+        try:
+            self.menu_font = pygame.font.SysFont(None, 48)
+            self.menu_small_font = pygame.font.SysFont(None, 28)
+        except Exception:
+            pygame.font.init()
+            self.menu_font = pygame.font.SysFont(None, 48)
+            self.menu_small_font = pygame.font.SysFont(None, 28)
+        # ...existing code...
 
         # create clock and players first so we can align rope to their center
         self.clock = pygame.time.Clock()
@@ -336,41 +361,29 @@ class Game:
             self.state = "waiting"
 
     def draw_menu(self):
-        self.screen.fill((18, 18, 30))
-        title = "Tug Of War"
-        title_surf = self.title_font.render(title, True, (255, 230, 160))
-        title_rect = title_surf.get_rect(center=(self.width//2, self.height//2 - 100))
-        self.screen.blit(title_surf, title_rect)
+        if getattr(self, "menu_bg", None):
+            self.screen.blit(self.menu_bg, (0, 0))
+        else:
+            self.screen.fill((20, 30, 40))
 
-        lines = [
-            "Press 1 for Single-player (vs AI)",
-            "Press 2 for Two-player (local)",
-            "Controls: A = Left pull    L = Right pull",
-            "Press Esc to quit"
-        ]
-        for i, line in enumerate(lines):
-            # if a choice is flickering, compute visibility / color for that line
-            visible = True
-            color = (200, 200, 200)
-            if self.menu_selected_choice is not None:
-                # map '1' -> index 0, '2' -> index 1
-                sel_index = 0 if self.menu_selected_choice == '1' else 1
-                if i == sel_index:
-                    # blink based on timer
-                    blink_phase = (self.menu_flicker_timer // self.menu_flicker_rate) % 2
-                    if blink_phase == 0:
-                        # visible frame, highlight
-                        color = (255, 250, 120)
-                    else:
-                        # hidden/dim frame
-                        color = (70, 70, 70)
-                else:
-                    # other lines dim while selection flickers
-                    color = (120, 120, 120)
+        # ...existing menu title / logo drawing code ...
 
-            surf = self.small_font.render(line, True, color)
-            rect = surf.get_rect(center=(self.width//2, self.height//2 - 20 + i*30))
-            self.screen.blit(surf, rect)
+        t1 = "Press 1 for 1P"
+        t2 = "Press 2 for 2P"
+        s1 = self.menu_small_font.render(t1, True, (255, 255, 255))
+        s2 = self.menu_small_font.render(t2, True, (255, 255, 255))
+
+        spacing = 40  # pixels between the two strings
+        total_w = s1.get_width() + spacing + s2.get_width()
+        # move both labels a bit to the left; reduce shift to 15
+        left_shift = 15
+        start_x = (self.width - total_w) // 2 - left_shift
+        start_x = max(10, start_x)  # don't go off-screen
+        bottom_margin = 20
+        y = self.height - bottom_margin - s1.get_height()
+
+        self.screen.blit(s1, (start_x, y))
+        self.screen.blit(s2, (start_x + s1.get_width() + spacing, y))
 
     def draw_game_over(self):
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
