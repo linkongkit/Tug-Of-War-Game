@@ -5,6 +5,8 @@ from .rope import Rope
 from .utils import load_image, load_sound, load_music
 from game.projectile import Bomb
 import random
+import os
+import pygame
 
 # Minimal SpriteEffect implementation used by spawn_effect.
 # Provides update(), draw() and finished flag so effects list in Game works.
@@ -83,18 +85,46 @@ class Game:
         else:
             print("[debug] menu background not found; checked:", bg_candidates)
 
-        # ensure fonts available for menu text
-        try:
-            self.menu_font = pygame.font.SysFont(None, 48)
-            self.menu_small_font = pygame.font.SysFont(None, 28)
-        except Exception:
-            pygame.font.init()
-            self.menu_font = pygame.font.SysFont(None, 48)
-            self.menu_small_font = pygame.font.SysFont(None, 28)
-
-        # new: smaller font for the left/right control hints
-        self.menu_hint_font = pygame.font.SysFont(None, 18)
-        # ...existing code...
+        # -------- Determination font (robust lookup + debug) --------
+        pygame.font.init()
+        font_candidates = [
+            os.path.join(os.path.dirname(__file__), "..", "assets", "fonts", "determination.ttf"),
+            os.path.join(os.path.dirname(__file__), "..", "..", "src", "assets", "fonts", "determination.ttf"),
+            os.path.join(os.getcwd(), "src", "assets", "fonts", "determination.ttf"),
+            os.path.join(os.getcwd(), "assets", "fonts", "determination.ttf"),
+            os.path.normpath("src/assets/fonts/determination.ttf"),
+            os.path.normpath("assets/fonts/determination.ttf"),
+        ]
+        font_path = None
+        for p in font_candidates:
+            p = os.path.abspath(p)
+            if os.path.isfile(p):
+                font_path = p
+                break
+        if font_path:
+            try:
+                # even smaller sizes
+                self.menu_font = pygame.font.Font(font_path, 28)
+                self.menu_small_font = pygame.font.Font(font_path, 14)
+                self.menu_hint_font = pygame.font.Font(font_path, 12)
+                self.menu_label_font = pygame.font.Font(font_path, 12)
+                self.determination_hint_font = pygame.font.Font(font_path, 10)
+                print(f"[debug] loaded determination.ttf from: {font_path}")
+            except Exception as e:
+                print(f"[debug] failed to load determination.ttf from {font_path}: {e}")
+                self.menu_font = pygame.font.SysFont(None, 28)
+                self.menu_small_font = pygame.font.SysFont(None, 14)
+                self.menu_hint_font = pygame.font.SysFont(None, 12)
+                self.menu_label_font = pygame.font.SysFont(None, 12)
+                self.determination_hint_font = pygame.font.SysFont(None, 10)
+        else:
+            print("[debug] determination.ttf not found. Checked:", font_candidates)
+            self.menu_font = pygame.font.SysFont(None, 28)
+            self.menu_small_font = pygame.font.SysFont(None, 14)
+            self.menu_hint_font = pygame.font.SysFont(None, 12)
+            self.menu_label_font = pygame.font.SysFont(None, 12)
+            self.determination_hint_font = pygame.font.SysFont(None, 10)
+        # ------------------------------------------------------------
 
         # create clock and players first so we can align rope to their center
         self.clock = pygame.time.Clock()
