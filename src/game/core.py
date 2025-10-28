@@ -401,7 +401,7 @@ class Game:
 
         # ...existing menu title / logo drawing code ...
 
-        # Draw the 1P / 2P labels (unchanged)
+        # Draw the 1P / 2P labels (replace with flicker-aware blit)
         t1 = "Press 1 for 1P"
         t2 = "Press 2 for 2P"
         s1 = self.menu_small_font.render(t1, True, (255, 255, 255))
@@ -415,10 +415,28 @@ class Game:
         bottom_margin = 20
         y = self.height - bottom_margin - s1.get_height()
 
-        # Blit the 1P / 2P labels
-        self.screen.blit(s1, (start_x, y))
+        # Blit the 1P / 2P labels (replace with flicker-aware blit)
         s2_x = start_x + s1.get_width() + spacing
-        self.screen.blit(s2, (s2_x, y))
+
+        # determine flicker visibility (guarded so missing attrs won't crash)
+        mf_timer = getattr(self, "menu_flicker_timer", 0)
+        mf_rate = getattr(self, "menu_flicker_rate", 4) or 4
+        mf_choice = getattr(self, "menu_selected_choice", None)
+
+        # default visible
+        vis1 = True
+        vis2 = True
+
+        # if flicker active for a choice, toggle visibility every mf_rate frames
+        if mf_timer > 0 and mf_choice == '1':
+            vis1 = ((mf_timer // mf_rate) % 2) == 0
+        if mf_timer > 0 and mf_choice == '2':
+            vis2 = ((mf_timer // mf_rate) % 2) == 0
+
+        if vis1:
+            self.screen.blit(s1, (start_x, y))
+        if vis2:
+            self.screen.blit(s2, (s2_x, y))
 
         # stacked control hints (three rows) using the smaller hint font
         left_lines = ["A = Pull", "D = Bomb", "F = Clone"]
