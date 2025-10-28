@@ -91,6 +91,9 @@ class Game:
             pygame.font.init()
             self.menu_font = pygame.font.SysFont(None, 48)
             self.menu_small_font = pygame.font.SysFont(None, 28)
+
+        # new: smaller font for the left/right control hints
+        self.menu_hint_font = pygame.font.SysFont(None, 18)
         # ...existing code...
 
         # create clock and players first so we can align rope to their center
@@ -368,22 +371,59 @@ class Game:
 
         # ...existing menu title / logo drawing code ...
 
+        # Draw the 1P / 2P labels (unchanged)
         t1 = "Press 1 for 1P"
         t2 = "Press 2 for 2P"
         s1 = self.menu_small_font.render(t1, True, (255, 255, 255))
         s2 = self.menu_small_font.render(t2, True, (255, 255, 255))
 
-        spacing = 40  # pixels between the two strings
+        spacing = 40
         total_w = s1.get_width() + spacing + s2.get_width()
-        # move both labels a bit to the left; reduce shift to 15
         left_shift = 15
         start_x = (self.width - total_w) // 2 - left_shift
-        start_x = max(10, start_x)  # don't go off-screen
+        start_x = max(10, start_x)
         bottom_margin = 20
         y = self.height - bottom_margin - s1.get_height()
 
+        # Blit the 1P / 2P labels
         self.screen.blit(s1, (start_x, y))
-        self.screen.blit(s2, (start_x + s1.get_width() + spacing, y))
+        s2_x = start_x + s1.get_width() + spacing
+        self.screen.blit(s2, (s2_x, y))
+
+        # stacked control hints (three rows) using the smaller hint font
+        left_lines = ["A = Pull", "D = Bomb", "F = Clone"]
+        right_lines = ["L = Pull", "J = Bomb", "H = Clone"]
+        hint_color = (200, 200, 200)
+        v_spacing = 4
+
+        # render left hint surfaces with smaller font and align to left window edge (x=10)
+        left_surfs = [self.menu_hint_font.render(t, True, hint_color) for t in left_lines]
+        left_max_w = max(s.get_width() for s in left_surfs)
+        left_x = 10  # flush to left frame with 10px padding
+
+        # render right hint surfaces and align to right window edge (width - pad)
+        right_surfs = [self.menu_hint_font.render(t, True, hint_color) for t in right_lines]
+        right_max_w = max(s.get_width() for s in right_surfs)
+        right_x = self.width - right_max_w - 10  # flush to right frame with 10px padding
+
+        # vertical centering of the stacked hints relative to the label baseline y
+        n = len(left_surfs)
+        line_h = left_surfs[0].get_height()
+        total_h = n * line_h + (n - 1) * v_spacing
+        top_y = y - total_h // 2
+
+        # blit left stacked hints
+        ty = top_y
+        for surf in left_surfs:
+            self.screen.blit(surf, (left_x, ty))
+            ty += line_h + v_spacing
+
+        # blit right stacked hints
+        ty = top_y
+        for surf in right_surfs:
+            # for right alignment of each line, shift by its width so text is flush to right_x
+            self.screen.blit(surf, (right_x, ty))
+            ty += line_h + v_spacing
 
     def draw_game_over(self):
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
