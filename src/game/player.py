@@ -105,9 +105,9 @@ class Player:
 
         # active particle/effect list
         self.effects = []
-        # explosion setup: reduced duration for faster animation
+        # explosion setup: duration in milliseconds (e.g. 600ms total for 6 frames -> 100ms/frame)
         self.explosion_frames = load_sequence("explosion", 6)
-        self.explosion_duration = 60  # reduced for smoother timing
+        self.explosion_duration_ms = 600
         self.explosion_anim = None
 
     def press_pull(self):
@@ -135,16 +135,29 @@ class Player:
         self.spawn_explosion()
 
     def spawn_explosion(self):
+        """
+        Spawn explosion centered on the player's visual center (adjusted for sprite baseline).
+        """
         if not getattr(self, "explosion_frames", None):
             return
-        cx = self.x + self.width // 2
-        cy = self.y - self.height // 2  # center on player's body
-        # target_size larger for visibility
-        target_w = int(self.width * 2.0)
-        target_h = int(self.height * 2.0)
-        self.explosion_anim = ExplosionAnim(cx, cy, self.explosion_frames, self.explosion_duration, target_size=(target_w, target_h))
 
-    def update(self):
+        # prefer existing rect if present (most accurate). fallback to (x,y,width,height)
+        try:
+            center_x, center_y = self.rect.center
+        except Exception:
+            center_x = int(self.x + self.width / 2)
+            center_y = int(self.y + self.height / 2)
+
+        # adjust y_offset to move explosion up (negative = up; positive = down)
+        # increased to -30 for more upward movement; tweak as needed
+        y_offset = -30
+        center_y += y_offset
+
+        # size explosion relative to player; tweak multiplier as needed
+        size = int(max(self.width, self.height) * 1.6)
+        self.explosion_anim = ExplosionAnim(center_x, center_y, self.explosion_frames, self.explosion_duration_ms, target_size=(size, size))
+
+    def update(self, *args, **kwargs):
         # clone timer
         if self.clone_timer > 0:
             self.clone_timer -= 1
@@ -283,6 +296,7 @@ class Player:
         for e in self.effects:
             e.draw(surface)
 
+        # draw explosion on top, centered at the adjusted player's center
         if self.explosion_anim:
             self.explosion_anim.draw(surface)
 
