@@ -107,7 +107,8 @@ class Player:
         self.effects = []
         # explicit total explosion time in milliseconds (set small so frames advance)
         # 300 ms total for 6 frames -> 50 ms per frame
-        self.explosion_duration_ms = 300
+        # total explosion time in milliseconds: 6 frames * 100ms = 600ms
+        self.explosion_duration_ms = 600
         self.explosion_frames = load_sequence("explosion", 6)
         self.explosion_anim = None
 
@@ -157,7 +158,7 @@ class Player:
         self.explosion_anim = ExplosionAnim(cx, cy, self.explosion_frames, duration_ms=self.explosion_duration_ms, target_size=(size, size))
 
     def update(self, *args, **kwargs):
-        # always update explosion animation first so timing is continuous
+        # always update explosion animation first
         if getattr(self, "explosion_anim", None):
             self.explosion_anim.update()
             if not self.explosion_anim.alive:

@@ -2,20 +2,43 @@ import pygame
 from .utils import load_image
 
 def load_sequence(name, num_frames):
+    """
+    Load a sequence of images. Supports two common patterns:
+      - name + index + .png   (e.g. "explosion" -> explosion0.png)
+      - name + index padded   (e.g. "clone-smoke/frame_" -> clone-smoke/frame_000.png)
+    Tries both index and zero-padded (3 digits).
+    """
     frames = []
     for i in range(num_frames):
-        fname = f"{name}{i}.png"
-        img = load_image(fname)
-        if img:
-            frames.append(img)
+        tried = []
+        candidates = [
+            f"{name}{i}.png",
+            f"{name}{i:03d}.png",
+            # also support if caller passed base without trailing separator
+            f"{name}/{i}.png",
+            f"{name}/{i:03d}.png",
+        ]
+        found = None
+        for fname in candidates:
+            tried.append(fname)
+            img = load_image(fname)
+            if img:
+                found = img
+                break
+        if found:
+            frames.append(found)
         else:
-            print(f"[debug] Failed to load {fname}")
+            print(f"[debug] Failed to load sequence frame for index {i}, tried: {tried}")
     print(f"[debug] load_sequence('{name}', {num_frames}) -> {len(frames)} frames")
     return frames
 
 class Anim:
+    """
+    Time-based animation. duration_ms is total animation length in milliseconds.
+    If duration_ms is None, default is 100 ms per frame.
+    """
     def __init__(self, x, y, frames, duration_ms=None):
-        self.frames = frames or []
+        self.frames = list(frames or [])
         self.n_frames = len(self.frames)
         if self.n_frames == 0:
             self.alive = False
@@ -36,9 +59,6 @@ class Anim:
         self.rect = self.image.get_rect(center=self.center)
         self.alive = True
 
-        # debug: print animation timing info once on creation
-        print(f"[dbg-anim] created: n_frames={self.n_frames} duration_ms={self.duration_ms:.1f} per_frame_ms={self.per_frame_ms:.1f} start_time={self.start_time}")
-
     def update(self):
         if not self.alive:
             return
@@ -46,16 +66,12 @@ class Anim:
         elapsed = now - self.start_time
         idx = int(elapsed // self.per_frame_ms)
         if idx >= self.n_frames:
-            # animation finished
             self.alive = False
-            print(f"[dbg-anim] finished after elapsed={elapsed}ms")
             return
         if idx != self.frame_index:
-            prev = self.frame_index
             self.frame_index = idx
             self.image = self.frames[self.frame_index]
             self.rect = self.image.get_rect(center=self.center)
-            print(f"[dbg-anim] frame change: prev={prev} -> now={self.frame_index} elapsed={elapsed} per_frame_ms={self.per_frame_ms:.1f}")
 
     def draw(self, surface):
         if self.alive and self.image:
@@ -81,4 +97,33 @@ class ExplosionAnim(Anim):
                     nf = pygame.transform.scale(f, (nw, nh))
                 scaled.append(nf)
             frames = scaled
+        super().__init__(x, y, frames, duration_ms)
+
+class CloneSmokeAnim(Anim):
+    """
+    Anim subclass forcing 50 ms per frame unless caller supplies explicit duration_ms.
+    """
+    def __init__(self, x, y, frames, per_frame_ms=50, duration_ms=None, scale=None, target_size=None):
+        # same scaling logic as ExplosionAnim
+        if target_size and frames:
+            fw, fh = frames[0].get_size()
+            if fw > 0 and fh > 0:
+                sx = float(target_size[0]) / fw
+                sy = float(target_size[1]) / fh
+                scale = max(sx, sy)
+        if scale is not None and scale != 1.0 and frames:
+            scaled = []
+            for f in frames:
+                nw = max(1, int(f.get_width() * scale))
+                nh = max(1, int(f.get_height() * scale))
+                try:
+                    nf = pygame.transform.smoothscale(f, (nw, nh))
+                except Exception:
+                    nf = pygame.transform.scale(f, (nw, nh))
+                scaled.append(nf)
+            frames = scaled
+
+        if duration_ms is None:
+            duration_ms = per_frame_ms * len(frames) if frames else 0
+
         super().__init__(x, y, frames, duration_ms)
